@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Aprilprojekt Pacman klon</title>
+
+    <link type="text/css" rel="stylesheet" href="style.css"/>
+    <script type="text/javascript" src="script.js"></script>
+
+</head>
+<body onload="Start()">
+
+<div id="header">
+    <h1>Aprilprojekt: Pacman</h1>
+</div>
+
+<div id="main">
+
+    <div id="GameView" class="layer">
+        <canvas id="canvas"></canvas>
+        <div class="button" onclick="OnButtonClick(1)">Pause</div>
+    </div>
+    <div id="MainMenu" class="layer">
+        <h1>Pacman Klon</h1>
+        <div class="button" onclick="OnButtonClick(2)">Start</div>
+    </div>
+    <div id="PauseMenu" class="layer">
+        <div class="button" onclick="OnButtonClick(3)">Weiter</div>
+        <div class="button" onclick="OnButtonClick(2)">Neustart</div>
+        <div class="button" onclick="OnButtonClick(0)">Hauptmenü</div>
+    </div>
+</div>
+
+</body>
+</html>
