@@ -90,10 +90,10 @@ class Game {
         canvas = document.getElementById("canvas");
         context = canvas.getContext("2d");
 
-        canvas.width = 600;
-        canvas.height = 400;
+        canvas.width = 640;
+        canvas.height = 480;
 
-        cellSize = 20;
+        cellSize = 32;
 
         columns = canvas.width / cellSize;
         rows = canvas.height / cellSize;
@@ -149,6 +149,8 @@ class Game {
 
         e.update();
         a.update();
+        if(a.checkEnemyCollision(e))
+            OnButtonClick(2);
         Render();
 
     }
@@ -159,7 +161,7 @@ class Game {
 
         for (let i = 0; i < map.length; i++) {
 
-            context.drawImage(sprite, map[i] * 16, 0, 16, 16, (i % 12) * cellSize, Math.floor(i / 12) * cellSize, cellSize, cellSize);
+            context.drawImage(sprite, map[i] * 16, 0, 16, 16, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
         }
         e.render();
         a.render();
@@ -185,10 +187,10 @@ class Game {
 
 class Object {
 
-    constructor(speed) {
+    constructor(speed, gridX, gridY) {
 
-        this.x = 0;
-        this.y = 0;
+        this.x = gridX * cellSize;
+        this.y = gridY * cellSize;
 
         this.velx = 0;
         this.vely = 0;
@@ -249,7 +251,7 @@ class Object {
 
     getCurrentIndex() {
 
-        return map[this.gridX + this.gridY * 12];
+        return map[this.gridX + this.gridY * 20];
 
     }
 
@@ -315,19 +317,13 @@ class Object {
 
     }
 
-    /*draw() {
-
-        context.fillRect(this.x, this.y, cellSize, cellSize);
-
-    }*/
-
 }
 
 class Enemy {
 
     constructor() {
 
-        this.object = new Object(70);
+        this.object = new Object(70, 9, 7);
 
     }
 
@@ -349,7 +345,7 @@ class Enemy {
 
             }
 
-            this.object.setDir(list[Math.floor(Math.random() * (count + 1))])
+            this.object.setDir(list[Math.floor(Math.random() * (count + 1))]);
 
         }
 
@@ -380,8 +376,8 @@ class Enemy {
     }
 
     render() {
-        //this.object.draw();
-        context.drawImage(sprite, 16 * 4, 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
+
+        context.drawImage(sprite, 16 * 5, 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
 
     }
 
@@ -391,13 +387,35 @@ class Player {
 
     constructor() {
 
-        this.object = new Object(100);
+        this.object = new Object(100, 0, 0);
+
+        this.animCounter = 0;
 
     }
 
     update() {
 
         this.object.update();
+
+        if(this.object.currentDir >= 0) {
+            this.animCounter += deltaTime * 10;
+            if(this.animCounter >= 4) {
+                this.animCounter = 0;
+            }
+        } else {
+            this.animCounter = 0;
+        }
+
+    }
+
+    checkEnemyCollision(enemy) {
+
+        let xDist = enemy.object.x - this.object.x;
+        let yDist = enemy.object.y - this.object.y;
+
+        let dist = Math.sqrt(xDist*xDist + yDist*yDist);
+
+        return dist <= cellSize * 0.5;
 
     }
 
@@ -423,8 +441,8 @@ class Player {
     }
 
     render() {
-        //this.object.draw();
-        context.drawImage(sprite, 0, 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
+
+        context.drawImage(sprite, 16 * Math.floor(this.animCounter), 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
 
     }
 
@@ -452,15 +470,31 @@ let SpriteCoords = {
 
 let map = [
 
-    2, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 3,
-    5, 2, 4, 4, 4, 10, 4, 4, 4, 4, 3, 5,
-    5, 5, 2, 4, 4, 10, 4, 4, 4, 3, 5, 5,
-    5, 5, 5, 2, 4, 10, 4, 4, 3, 5, 5, 5,
-    5, 5, 5, 0, 4, 10, 4, 4, 1, 5, 5, 5,
-    5, 5, 0, 4, 4, 10, 4, 4, 4, 1, 5, 5,
-    5, 0, 4, 4, 4, 10, 4, 4, 4, 4, 1, 5,
-    0, 4, 4, 4, 4, 9, 4, 4, 4, 4, 4, 1
+    2,3,2,8,4,4,4,4,8,3,2,8,4,4,4,4,8,3,2,3,
+    5,5,5,5,2,8,8,3,5,0,1,5,2,8,8,3,5,5,5,5,
+    0,9,1,7,1,5,5,5,0,3,2,1,5,5,5,0,6,0,9,1,
+    2,4,4,9,3,0,1,5,2,1,0,3,5,0,1,2,9,4,4,3,
+    7,4,4,3,7,4,8,10,9,4,4,9,10,8,4,6,2,4,4,6,
+    5,2,4,1,7,4,1,7,4,4,4,4,6,0,4,6,0,4,3,5,
+    5,0,4,3,5,2,4,6,2,9,4,3,7,4,3,5,2,4,1,5,
+    5,2,4,1,5,5,2,6,0,4,4,1,7,3,5,5,0,4,3,5,
+    5,0,4,3,7,9,1,7,8,4,4,8,6,0,9,6,2,4,1,5,
+    0,4,4,6,7,8,8,1,0,4,4,1,0,8,8,6,7,4,4,1,
+    2,4,4,1,5,5,5,2,8,4,4,8,3,5,5,5,0,4,4,3,
+    0,4,4,8,1,5,5,5,0,3,2,1,5,5,5,0,8,4,4,1,
+    2,8,3,7,3,0,1,5,2,1,0,3,5,0,1,2,6,2,8,3,
+    5,5,5,5,0,4,4,1,5,2,3,5,0,4,4,1,5,5,5,5,
+    0,1,0,9,4,4,4,4,9,1,0,9,4,4,4,4,9,1,0,1
 
 ];
+
+class Map {
+
+    constructor() {
+
+
+    }
+
+}
 
 // Map ----------------------------------
