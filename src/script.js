@@ -1,5 +1,6 @@
 let game;
 
+
 function Start() {
 
     SetView("MainMenu");
@@ -100,7 +101,6 @@ class Game {
 
         intervalTime = 10;
 
-//------------------
         sprite = new Image();
         sprite.src = "pacman_tileset.png";
         context.imageSmoothingEnabled = false;
@@ -131,7 +131,6 @@ class Game {
         now = Date.now();
 
         Reset();
-
         this.updater = setInterval(Update, intervalTime);
     }
 
@@ -139,18 +138,29 @@ class Game {
 
 {
 
-    let a;
-    let e;
+    let player;
+    let enemys;
 
     function Update() {
         lastTime = now;
         now = Date.now();
         deltaTime = (now - lastTime) / 1000;
 
-        e.update();
-        a.update();
-        if(a.checkEnemyCollision(e))
-            OnButtonClick(2);
+        player.update();
+        for(let i = 0; i < enemys.length; i++) {
+
+            enemys[i].update();
+            if(player.checkEnemyCollision(enemys[i])) {
+                player.lives --;
+                if(player.lives < 0)
+                    OnButtonClick(0);
+                player.object.x = 0;
+                player.object.y = 0;
+                player.object.setDir(-1);
+                player.object.changeDir(-1);
+            }
+
+        }
         Render();
 
     }
@@ -162,21 +172,45 @@ class Game {
         for (let i = 0; i < map.length; i++) {
 
             context.drawImage(sprite, map[i] * 16, 0, 16, 16, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
+            if(coins[i] !== 0)
+                context.drawImage(sprite, 7 * 16 + (coins[i] - 1) * 16, 16, 16, 16, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
         }
-        e.render();
-        a.render();
+        for(let i = 0; i < enemys.length; i++) {
+
+            enemys[i].render();
+
+        }
+        player.render();
     }
 
     function KeyDown(key) {
 
-        a.keyDown(key);
+        player.keyDown(key);
 
     }
 
     function Reset() {
 
-        e = new Enemy();
-        a = new Player();
+        enemys = [
+            new Enemy(0),
+            new Enemy(0),
+            new Enemy(0),
+            new Enemy(0),
+            new Enemy(1),
+            new Enemy(1),
+            new Enemy(1),
+            new Enemy(1),
+            new Enemy(2),
+            new Enemy(2),
+            new Enemy(2),
+            new Enemy(2)
+        ];
+        player = new Player();
+        for(let i = 0; i < resetCoins.length; i++) {
+
+            coins[i] = resetCoins[i];
+
+        }
     }
 
 }
@@ -293,7 +327,7 @@ class Object {
 
         }
 
-        if (this.stepper >= cellSize || this.stepper === 0 || this.stepper <= -cellSize) {
+        if (this.stepper >= cellSize || this.stepper === 0 || this.stepper <= -cellSize || this.currentDir === -1) {
 
             this.gridX = Math.floor(this.x / cellSize + 0.5);
             this.gridY = Math.floor(this.y / cellSize + 0.5);
@@ -321,10 +355,10 @@ class Object {
 
 class Enemy {
 
-    constructor() {
+    constructor(colorid) {
 
-        this.object = new Object(70, 9, 7);
-
+        this.colorid = 16 * 4 + colorid * 16;
+        this.object = new Object(90, 8, 7);
     }
 
     calcRandomDir() {
@@ -338,14 +372,16 @@ class Enemy {
 
             for(let i = 0; i < 4; i++) {
 
-                if(!this.object.checkCollision(i) && i !== this.object.notDir) {
+                if(!this.object.checkCollision(i) && (i !== this.object.notDir || this.object.currentDir === -1)) {
                     list[count] = i;
                     count++;
                 }
 
             }
 
-            this.object.setDir(list[Math.floor(Math.random() * (count + 1))]);
+            let dir = list[Math.floor(Math.random() * (count))];
+            this.object.setDir(dir);
+            this.object.changeDir(dir);
 
         }
 
@@ -358,7 +394,7 @@ class Enemy {
 
         this.object.stepper += (this.object.velx + this.object.vely) * deltaTime;
 
-        if (this.object.stepper >= cellSize || this.object.stepper === 0 || this.object.stepper <= -cellSize) {
+        if (this.object.stepper >= cellSize || this.object.stepper <= -cellSize || this.object.currentDir === -1) {
 
             this.object.gridX = Math.floor(this.object.x / cellSize + 0.5);
             this.object.gridY = Math.floor(this.object.y / cellSize + 0.5);
@@ -369,15 +405,13 @@ class Enemy {
             this.object.stepper = 0;
 
             this.calcRandomDir();
-            if(this.object.newDir !== this.object.currentDir)
-                this.object.changeDir(this.object.newDir);
 
         }
     }
 
     render() {
 
-        context.drawImage(sprite, 16 * 5, 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
+        context.drawImage(sprite, this.colorid, 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
 
     }
 
@@ -391,11 +425,45 @@ class Player {
 
         this.animCounter = 0;
 
+        this.points = 0;
+        this.lives = 3;
+
+    }
+
+    checkCoins() {
+
+        for(let i = 0; i < coins.length; i++) {
+
+            if(coins[i] !== 0)
+                return;
+
+        }
+        OnButtonClick(0);
+
     }
 
     update() {
 
         this.object.update();
+
+        if(this.object.stepper === 0) {
+
+            let coin = coins[this.object.gridX + this.object.gridY * 20];
+
+            if(coin >= 1) {
+
+                if(coin === 1) {
+                    this.points += 10;
+                } else {
+                    this.points += 50;
+                }
+
+                coins[this.object.gridX + this.object.gridY * 20] = 0;
+                this.checkCoins();
+
+            }
+
+        }
 
         if(this.object.currentDir >= 0) {
             this.animCounter += deltaTime * 10;
@@ -452,32 +520,16 @@ class Player {
 
 // Map ----------------------------------
 
-let SpriteCoords = {
-
-    topright: 0,
-    topleft: 1,
-    bottomright: 2,
-    bottomleft: 3,
-    straightleft: 4,
-    straightup: 5,
-    straightuptoleft: 6,
-    straightuptoright: 7,
-    straightlefttobottom: 8,
-    straightlefttotop: 9,
-    cross: 10
-
-};
-
 let map = [
 
-    2,3,2,8,4,4,4,4,8,3,2,8,4,4,4,4,8,3,2,3,
+    2,3,2,2,4,4,4,4,8,3,2,8,4,4,4,4,8,3,2,3,
     5,5,5,5,2,8,8,3,5,0,1,5,2,8,8,3,5,5,5,5,
     0,9,1,7,1,5,5,5,0,3,2,1,5,5,5,0,6,0,9,1,
     2,4,4,9,3,0,1,5,2,1,0,3,5,0,1,2,9,4,4,3,
     7,4,4,3,7,4,8,10,9,4,4,9,10,8,4,6,2,4,4,6,
     5,2,4,1,7,4,1,7,4,4,4,4,6,0,4,6,0,4,3,5,
-    5,0,4,3,5,2,4,6,2,9,4,3,7,4,3,5,2,4,1,5,
-    5,2,4,1,5,5,2,6,0,4,4,1,7,3,5,5,0,4,3,5,
+    5,0,4,3,5,2,4,6,8,4,4,8,7,4,3,5,2,4,1,5,
+    5,2,4,1,5,5,2,6,7,4,4,6,7,3,5,5,0,4,3,5,
     5,0,4,3,7,9,1,7,8,4,4,8,6,0,9,6,2,4,1,5,
     0,4,4,6,7,8,8,1,0,4,4,1,0,8,8,6,7,4,4,1,
     2,4,4,1,5,5,5,2,8,4,4,8,3,5,5,5,0,4,4,3,
@@ -488,13 +540,25 @@ let map = [
 
 ];
 
-class Map {
+let coins = [];
+const resetCoins = [
 
-    constructor() {
+    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,
+    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,
 
-
-    }
-
-}
+];
 
 // Map ----------------------------------
