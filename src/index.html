@@ -17,15 +17,26 @@
 <div id="main">
 
     <div id="GameView" class="layer">
+
         <canvas id="canvas"></canvas>
-        <div class="button" onclick="OnButtonClick(1)">Pause</div>
+        <div id="ingameMenu">
+            <div id="params"></div>
+            <div class="button pause" onclick="OnButtonClick(1)">Pause</div>
+        </div>
     </div>
     <div id="MainMenu" class="layer">
         <h1>Pacman Klon</h1>
         <div class="button" onclick="OnButtonClick(2)">Start</div>
     </div>
     <div id="PauseMenu" class="layer">
+        <h1>Pause</h1>
         <div class="button" onclick="OnButtonClick(3)">Weiter</div>
+        <div class="button" onclick="OnButtonClick(2)">Neustart</div>
+        <div class="button" onclick="OnButtonClick(0)">Hauptmenü</div>
+    </div>
+    <div id="EndGame" class="layer">
+        <h1 id="text">test</h1>
+        <p id="score">test</p>
         <div class="button" onclick="OnButtonClick(2)">Neustart</div>
         <div class="button" onclick="OnButtonClick(0)">Hauptmenü</div>
     </div>

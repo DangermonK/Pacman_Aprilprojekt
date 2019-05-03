@@ -1,5 +1,6 @@
 let game;
 
+let spriteSize = 16;
 
 function Start() {
 
@@ -21,7 +22,8 @@ function Start() {
 
         "MainMenu",
         "PauseMenu",
-        "GameView"
+        "GameView",
+        "EndGame"
 
     ];
 
@@ -63,9 +65,31 @@ function Start() {
 
     }
 
+    function setEndScreen(win, score) {
+
+        game.quitGame();
+
+        if(win) {
+
+            document.getElementById("text").textContent = "Gewonnen!";
+            document.getElementById("score").textContent = "Erreichte Punkte: " + score;
+
+        } else {
+
+            document.getElementById("text").textContent = "Spiel Verloren";
+            document.getElementById("score").textContent = "Erreichte Punkte: " + score;
+
+        }
+
+        SetView("EndGame");
+
+    }
+
 }   // Menu Handling
 
 // Game Handling ------------------------
+
+let params;
 
 //Time handling
 let lastTime;
@@ -90,6 +114,9 @@ class Game {
 
         canvas = document.getElementById("canvas");
         context = canvas.getContext("2d");
+
+        params = document.getElementById("params");
+        params.innerHTML = "Leben: 3   Punkte: 0";
 
         canvas.width = 640;
         canvas.height = 480;
@@ -136,6 +163,8 @@ class Game {
 
 }
 
+let weak;
+
 {
 
     let player;
@@ -147,17 +176,44 @@ class Game {
         deltaTime = (now - lastTime) / 1000;
 
         player.update();
-        for(let i = 0; i < enemys.length; i++) {
+
+        if (player.hasCover) {
+
+            if (player.coverTimer === 0)
+                weak = true;
+
+            player.coverTimer += deltaTime;
+
+            if (player.coverTimer >= player.coverTime) {
+                player.coverTimer = 0;
+                player.hasCover = false;
+                weak = false;
+            }
+
+        }
+
+        for (let i = 0; i < enemys.length; i++) {
 
             enemys[i].update();
-            if(player.checkEnemyCollision(enemys[i])) {
-                player.lives --;
-                if(player.lives < 0)
-                    OnButtonClick(0);
-                player.object.x = 0;
-                player.object.y = 0;
-                player.object.setDir(-1);
-                player.object.changeDir(-1);
+            if (player.checkEnemyCollision(enemys[i])) {
+                if (!player.hasCover) {
+                    player.lives--;
+
+                    if (player.lives < 0) {
+                        setEndScreen(false, player.points);
+
+                    }
+                    player.object.x = 0;
+                    player.object.y = 0;
+                    player.object.setDir(-1);
+                    player.object.changeDir(-1);
+                } else {
+                    player.points += 100;
+                    enemys[i].object.setTo(8, 7);
+
+                }
+                params.innerHTML = "Leben: " + player.lives + "   Punkte: " + player.points;
+
             }
 
         }
@@ -171,11 +227,11 @@ class Game {
 
         for (let i = 0; i < map.length; i++) {
 
-            context.drawImage(sprite, map[i] * 16, 0, 16, 16, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
-            if(coins[i] !== 0)
-                context.drawImage(sprite, 7 * 16 + (coins[i] - 1) * 16, 16, 16, 16, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
+            context.drawImage(sprite, map[i] * spriteSize, 0, spriteSize, spriteSize, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
+            if (coins[i] !== 0)
+                context.drawImage(sprite, 7 * spriteSize + (coins[i] - 1) * spriteSize, spriteSize, spriteSize, spriteSize, (i % 20) * cellSize, Math.floor(i / 20) * cellSize, cellSize, cellSize);
         }
-        for(let i = 0; i < enemys.length; i++) {
+        for (let i = 0; i < enemys.length; i++) {
 
             enemys[i].render();
 
@@ -206,11 +262,14 @@ class Game {
             new Enemy(2)
         ];
         player = new Player();
-        for(let i = 0; i < resetCoins.length; i++) {
+        for (let i = 0; i < resetCoins.length; i++) {
 
             coins[i] = resetCoins[i];
 
         }
+        params.innerHTML = "Leben: 3   Punkte: 0";
+        weak = false;
+
     }
 
 }
@@ -230,6 +289,23 @@ class Object {
         this.vely = 0;
 
         this.speed = speed;
+
+        this.stepper = 0;
+
+        this.currentDir = -1;
+
+        this.setDir(-1);
+        this.changeDir(-1);
+
+    }
+
+    setTo(gridX, gridY) {
+
+        this.x = gridX * cellSize;
+        this.y = gridY * cellSize;
+
+        this.velx = 0;
+        this.vely = 0;
 
         this.stepper = 0;
 
@@ -357,22 +433,25 @@ class Enemy {
 
     constructor(colorid) {
 
-        this.colorid = 16 * 4 + colorid * 16;
+        this.colorid = spriteSize * 4 + colorid * spriteSize;
         this.object = new Object(90, 8, 7);
+
+        this.animTimer = 0;
+        this.animSpeed = 2;
     }
 
     calcRandomDir() {
 
         let index = this.object.getCurrentIndex();
 
-        if(index !== 4 && index !== 5) {
+        if (index !== 4 && index !== 5) {
 
             let list = Array(4);
             let count = 0;
 
-            for(let i = 0; i < 4; i++) {
+            for (let i = 0; i < 4; i++) {
 
-                if(!this.object.checkCollision(i) && (i !== this.object.notDir || this.object.currentDir === -1)) {
+                if (!this.object.checkCollision(i) && (i !== this.object.notDir || this.object.currentDir === -1)) {
                     list[count] = i;
                     count++;
                 }
@@ -411,7 +490,14 @@ class Enemy {
 
     render() {
 
-        context.drawImage(sprite, this.colorid, 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
+        if (!weak) {
+            context.drawImage(sprite, this.colorid, spriteSize + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * spriteSize, spriteSize, spriteSize, this.object.x, this.object.y, cellSize, cellSize);
+        } else {
+            this.animTimer += deltaTime * 2;
+            if (this.animTimer >= 2)
+                this.animTimer = 0;
+            context.drawImage(sprite, 9 * spriteSize + Math.floor(this.animTimer) * spriteSize, spriteSize + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * spriteSize, spriteSize, spriteSize, this.object.x, this.object.y, cellSize, cellSize);
+        }
 
     }
 
@@ -428,17 +514,21 @@ class Player {
         this.points = 0;
         this.lives = 3;
 
+        this.hasCover = false;
+        this.coverTimer = 0;
+        this.coverTime = 10;
+
     }
 
     checkCoins() {
 
-        for(let i = 0; i < coins.length; i++) {
+        for (let i = 0; i < coins.length; i++) {
 
-            if(coins[i] !== 0)
+            if (coins[i] !== 0)
                 return;
 
         }
-        OnButtonClick(0);
+        setEndScreen(true, this.points);
 
     }
 
@@ -446,28 +536,31 @@ class Player {
 
         this.object.update();
 
-        if(this.object.stepper === 0) {
+        if (this.object.stepper === 0) {
 
             let coin = coins[this.object.gridX + this.object.gridY * 20];
 
-            if(coin >= 1) {
+            if (coin >= 1) {
 
-                if(coin === 1) {
+                if (coin === 1) {
                     this.points += 10;
                 } else {
                     this.points += 50;
+                    this.hasCover = true;
                 }
 
                 coins[this.object.gridX + this.object.gridY * 20] = 0;
+                params.innerHTML = "Leben: " + this.lives + "   Punkte: " + this.points;
+
                 this.checkCoins();
 
             }
 
         }
 
-        if(this.object.currentDir >= 0) {
+        if (this.object.currentDir >= 0) {
             this.animCounter += deltaTime * 10;
-            if(this.animCounter >= 4) {
+            if (this.animCounter >= 4) {
                 this.animCounter = 0;
             }
         } else {
@@ -481,7 +574,7 @@ class Player {
         let xDist = enemy.object.x - this.object.x;
         let yDist = enemy.object.y - this.object.y;
 
-        let dist = Math.sqrt(xDist*xDist + yDist*yDist);
+        let dist = Math.sqrt(xDist * xDist + yDist * yDist);
 
         return dist <= cellSize * 0.5;
 
@@ -510,7 +603,7 @@ class Player {
 
     render() {
 
-        context.drawImage(sprite, 16 * Math.floor(this.animCounter), 16 + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * 16, 16, 16, this.object.x, this.object.y, cellSize, cellSize);
+        context.drawImage(sprite, spriteSize * Math.floor(this.animCounter), spriteSize + ((this.object.currentDir >= 0) ? this.object.currentDir : 0) * spriteSize, spriteSize, spriteSize, this.object.x, this.object.y, cellSize, cellSize);
 
     }
 
@@ -522,42 +615,42 @@ class Player {
 
 let map = [
 
-    2,3,2,2,4,4,4,4,8,3,2,8,4,4,4,4,8,3,2,3,
-    5,5,5,5,2,8,8,3,5,0,1,5,2,8,8,3,5,5,5,5,
-    0,9,1,7,1,5,5,5,0,3,2,1,5,5,5,0,6,0,9,1,
-    2,4,4,9,3,0,1,5,2,1,0,3,5,0,1,2,9,4,4,3,
-    7,4,4,3,7,4,8,10,9,4,4,9,10,8,4,6,2,4,4,6,
-    5,2,4,1,7,4,1,7,4,4,4,4,6,0,4,6,0,4,3,5,
-    5,0,4,3,5,2,4,6,8,4,4,8,7,4,3,5,2,4,1,5,
-    5,2,4,1,5,5,2,6,7,4,4,6,7,3,5,5,0,4,3,5,
-    5,0,4,3,7,9,1,7,8,4,4,8,6,0,9,6,2,4,1,5,
-    0,4,4,6,7,8,8,1,0,4,4,1,0,8,8,6,7,4,4,1,
-    2,4,4,1,5,5,5,2,8,4,4,8,3,5,5,5,0,4,4,3,
-    0,4,4,8,1,5,5,5,0,3,2,1,5,5,5,0,8,4,4,1,
-    2,8,3,7,3,0,1,5,2,1,0,3,5,0,1,2,6,2,8,3,
-    5,5,5,5,0,4,4,1,5,2,3,5,0,4,4,1,5,5,5,5,
-    0,1,0,9,4,4,4,4,9,1,0,9,4,4,4,4,9,1,0,1
+    2, 3, 2, 2, 4, 4, 4, 4, 8, 3, 2, 8, 4, 4, 4, 4, 8, 3, 2, 3,
+    5, 5, 5, 5, 2, 8, 8, 3, 5, 0, 1, 5, 2, 8, 8, 3, 5, 5, 5, 5,
+    0, 9, 1, 7, 1, 5, 5, 5, 0, 3, 2, 1, 5, 5, 5, 0, 6, 0, 9, 1,
+    2, 4, 4, 9, 3, 0, 1, 5, 2, 1, 0, 3, 5, 0, 1, 2, 9, 4, 4, 3,
+    7, 4, 4, 3, 7, 4, 8, 10, 9, 4, 4, 9, 10, 8, 4, 6, 2, 4, 4, 6,
+    5, 2, 4, 1, 7, 4, 1, 7, 4, 4, 4, 4, 6, 0, 4, 6, 0, 4, 3, 5,
+    5, 0, 4, 3, 5, 2, 4, 6, 8, 4, 4, 8, 7, 4, 3, 5, 2, 4, 1, 5,
+    5, 2, 4, 1, 5, 5, 2, 6, 0, 4, 4, 6, 7, 3, 5, 5, 0, 4, 3, 5,
+    5, 0, 4, 3, 7, 9, 1, 7, 8, 4, 4, 8, 6, 0, 9, 6, 2, 4, 1, 5,
+    0, 4, 4, 6, 7, 8, 8, 1, 0, 4, 4, 1, 0, 8, 8, 6, 7, 4, 4, 1,
+    2, 4, 4, 1, 5, 5, 5, 2, 8, 4, 4, 8, 3, 5, 5, 5, 0, 4, 4, 3,
+    0, 4, 4, 8, 1, 5, 5, 5, 0, 3, 2, 1, 5, 5, 5, 0, 8, 4, 4, 1,
+    2, 8, 3, 7, 3, 0, 1, 5, 2, 1, 0, 3, 5, 0, 1, 2, 6, 2, 8, 3,
+    5, 5, 5, 5, 0, 4, 4, 1, 5, 2, 3, 5, 0, 4, 4, 1, 5, 5, 5, 5,
+    0, 1, 0, 9, 4, 4, 4, 4, 9, 1, 0, 9, 4, 4, 4, 4, 9, 1, 0, 1
 
 ];
 
 let coins = [];
 const resetCoins = [
 
-    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,
-    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,
+    0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,2,
+    0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,1,
+    0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,
+    0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,
+    1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,
+    1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,
+    1,1,1,1,0,1,1,0,0,0,0,0,0,1,1,0,1,1,1,1,
+    1,1,1,2,0,1,1,0,0,0,0,0,0,1,1,0,2,1,1,1,
+    1,1,1,1,0,1,1,0,0,0,0,0,0,1,1,0,1,1,1,1,
+    1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1,
+    1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,
+    0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+    1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,
+    1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,1,1,1,
+    2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2
 
 ];
 
